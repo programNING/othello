@@ -1,4 +1,12 @@
 #include "player.h"
+#define START_ALPHA (-100)
+#define START_BETA (100)
+
+#define C_ADJ_WEIGHT  (-3)
+#define CORNER_WEIGHT (4)
+#define EDGE_WEIGHT (2)
+#define C_DIAG_WEIGHT (-4)
+
 
 /*
  * Constructor for the player; initialize everything here. The side your AI is
@@ -7,13 +15,17 @@
  */
 Player::Player(Side side) {
     // Will be set to true in test_minimax.cpp.
-    testingMinimax = false;
+    testingMinimax = true;
 
     /* 
      * TODO: Do any initialization you need to do here (setting up the board,
      * precalculating things, etc.) However, remember that you will only have
      * 30 seconds.
      */
+     
+     // initialize a weight table
+     
+     initializeWeightTable();
      
      pside = side;
      opp_side = (side == BLACK) ? WHITE : BLACK;
@@ -25,6 +37,53 @@ Player::Player(Side side) {
 Player::~Player() {
 }
 
+
+void Player::initializeWeightTable() {
+	
+	for (int i = 0; i < 8; i++) {
+		for (int j = 0; j < 8; j++) {
+			Move * m = new Move(i, j);
+			 
+			if (i == 0 || i == 7) {
+				// next to corners but on edge
+				if (j == 1 || j == 6) {
+					table[m] = C_ADJ_WEIGHT;
+				}
+				// a corner
+				else if (j == 0 || j == 7) {
+					table[m] = CORNER_WEIGHT;
+				}
+				// an edge
+				else {
+					table[m] = EDGE_WEIGHT;
+				}
+			}
+		
+		// diagonal to corners
+			else if (i == 1 || i == 6) {
+				if (j == 6 || j == 1) {
+					table[m] = C_DIAG_WEIGHT;
+				}
+			}
+		
+			else if (j == 0 || j == 7) {
+				// next to corners but on edge
+				if (i == 1 || i == 6) {
+					table[m] = C_ADJ_WEIGHT;
+				}
+				// corner already accounted for
+				// an edge
+				else {
+					table[m] = EDGE_WEIGHT;
+				}
+			}
+			else {
+				// do something with the rest of the squares
+			} 
+					 
+		}
+	}
+}
 /*
  * Compute the next move given the opponent's last move. Your AI is
  * expected to keep track of the board on its own. If this is the first move,
@@ -61,11 +120,16 @@ Move *Player::doMove(Move *opponentsMove, int msLeft) {
 	Move * best_move; 
 	
 	if (!testingMinimax) {
+		
 		for (unsigned int i = 0; i < valid_moves.size(); i++) {
-			if (Heuristic(valid_moves[i]) > best_score) {
-				best_score = Heuristic(valid_moves[i]);
+			Board * copy = b.copy();
+			copy->doMove(valid_moves[i], pside);
+			int move_score = Heuristic(copy);
+			if (move_score > best_score) {
+				best_score = move_score;
 				best_move = valid_moves[i];
 			}
+			delete copy;
 		}
 		
 		// now to free valid moves
@@ -83,7 +147,7 @@ Move *Player::doMove(Move *opponentsMove, int msLeft) {
 	}
 	
 	else {
-		Minimax(&b, 2, true);
+		AB_Minimax(&b, 2, true, START_ALPHA, START_BETA);
 		best_move = minimax_best;
 		b.doMove(best_move, pside);
 	}
@@ -91,15 +155,16 @@ Move *Player::doMove(Move *opponentsMove, int msLeft) {
 	return best_move;
 }
 
-int Player::Minimax(Board * board, int depth, bool is_player) {
+int Player::AB_Minimax(Board * board, int depth, bool is_player, int alpha,
+					int beta) {
 	
 	if (depth == 0) {
-		return board->count(pside) - board->count(opp_side);
+//		return board->count(pside) - board->count(opp_side);
+		return Heuristic(board);
 	}
 
 	else {
 		if (is_player) {
-			int best_value = -100;
 			std::vector<Move*> curr_moves = board->getMoves(pside);
 			for (unsigned int i = 0; i < curr_moves.size(); i++) {
 				// make a copy of the board
@@ -109,20 +174,20 @@ int Player::Minimax(Board * board, int depth, bool is_player) {
 				iboard->doMove(curr_moves[i], pside);
 			
 				// see what value it returns
-				int curr_value = Minimax(iboard, depth - 1, false);
-				best_value = std::max(best_value, curr_value);
-				if (best_value == curr_value) {
+				int curr_value = AB_Minimax(iboard, depth - 1, false,
+								alpha, beta);
+				alpha = std::max(alpha, curr_value);
+				if (alpha == curr_value) {
 					minimax_best = curr_moves[i];
 				}
 				
 				delete iboard;
 			}
 			curr_moves.clear();
-			return best_value;
+			return alpha;
 			
 		}
 		else {
-			int best_value = 100;
 			std::vector<Move*> curr_moves = board->getMoves(opp_side);
 			for (unsigned int i = 0; i < curr_moves.size(); i++) {
 				// make a copy of the board
@@ -132,11 +197,15 @@ int Player::Minimax(Board * board, int depth, bool is_player) {
 				iboard->doMove(curr_moves[i], opp_side);
 			
 				// see what value it returns
-				int curr_value = Minimax(iboard, depth - 1, true);
-				best_value = std::min(best_value, curr_value);
+				int curr_value = AB_Minimax(iboard, depth - 1, true, alpha,
+										beta);
+				beta = std::min(beta, curr_value);
+				if (alpha > beta) {
+					break;
+				}
 			}
 			curr_moves.clear();
-			return best_value;
+			return beta;
 		}
 	}
 }
@@ -151,50 +220,30 @@ int Player::Minimax(Board * board, int depth, bool is_player) {
  * 
  **/
  
-int Player::Heuristic(Move * move) {
-	Board * copy = b.copy();
-	copy->doMove(move, pside);
-	int disc_count = (copy->count(pside) - copy->count(opp_side));
-	std::vector<Move*> moveslist = copy->getMoves(pside);
-	int heur_score = (10 * moveslist.size()) + disc_count;
+int Player::Heuristic(Board * board) {
+	
+	int player_disc = board->count(pside);
+	int opp_disc = board->count(opp_side);
+	
+	double dpar = (double)(player_disc - opp_disc) / (double)(player_disc + opp_disc);
+	int disc_parity = 10 * dpar;
+	
+	std::vector<Move*> moveslist = board->getMoves(pside);
+	std::vector<Move*> opp_moves = board->getMoves(opp_side);
+	
+	double mpar = (double)moveslist.size() - (double)opp_moves.size();
+	int move_parity = 10 * mpar;
+	
+	int heur_score = (move_parity + disc_parity);
+	
+	// clean up
+	moveslist.clear();
+	opp_moves.clear();
 	
 	// multiply if especially bad or good coordinate
 	
-	if (move->x == 0 || move->x == 7) {
-		// next to corners but on edge
-		if (move->y == 1 || move->y == 6) {
-			heur_score = heur_score * -2;
-		}
-		// a corner
-		else if (move->y == 0 || move->y == 7) {
-			heur_score = heur_score * 100;
-		}
-		// an edge
-		else {
-			heur_score = heur_score * 2;
-		}
-	}
 	
-	// diagonal to corners
-	if (move->x == 1 || move->x == 6) {
-		if (move->y == 6 || move->y == 1) {
-			heur_score = heur_score * -3;
-		}
-	}
-	
-	if (move->y == 0 || move->y == 7) {
-		// next to corners but on edge
-		if (move->x == 1 || move->x == 6) {
-			heur_score = heur_score * -2;
-		}
-		// corner already accounted for
-		// an edge
-		else {
-			heur_score = heur_score * 2;
-		}
-	}
 	
 	// free the copy board;
-	delete copy;
 	return heur_score;
 }

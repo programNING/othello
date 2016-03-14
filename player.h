@@ -6,6 +6,7 @@
 #include "board.h"
 #include <vector>
 #include <algorithm>
+#include <map>
 
 using namespace std;
 
@@ -16,8 +17,8 @@ public:
     ~Player();
     
     Move *doMove(Move *opponentsMove, int msLeft);
-    int Minimax(Board * board, int depth, bool s);
-    int Heuristic(Move * m);
+    int AB_Minimax(Board * board, int depth, bool s, int alpha, int beta);
+    int Heuristic(Board * b);
     
     
 
@@ -27,6 +28,9 @@ public:
     Board b;
 
 private:
+	void initializeWeightTable();
+	
+	std::map<Move *, int> table;
 	Side opp_side;
 	Side pside;
 	Move * minimax_best;
