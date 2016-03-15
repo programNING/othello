@@ -1,5 +1,5 @@
 CC          = g++
-CFLAGS      = -Wall -ansi -pedantic -ggdb
+CFLAGS      = -std=c++11 -Wall -pedantic -ggdb 
 OBJS        = player.o board.o
 PLAYERNAME  = meowmix
 

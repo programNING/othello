@@ -10,7 +10,7 @@ class Board {
    
 private:
     bitset<64> black;
-    bitset<64> taken;    
+    bitset<64> taken;  
        
     bool occupied(int x, int y);
     bool get(Side side, int x, int y);
@@ -21,7 +21,8 @@ public:
     Board();
     ~Board();
     Board *copy();
-        
+    
+    bitset<64> getStonesPlacement(Side side);  
     bool isDone();
     std::vector<Move*> getMoves(Side side);
     bool hasMoves(Side side);

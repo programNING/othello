@@ -171,6 +171,10 @@ int Board::countBlack() {
     return black.count();
 }
 
+bitset<64> Board::getStonesPlacement(Side side) {
+	return (side == BLACK) ? black : taken ^ black;
+}
+
 /*
  * Current count of white stones.
  */
